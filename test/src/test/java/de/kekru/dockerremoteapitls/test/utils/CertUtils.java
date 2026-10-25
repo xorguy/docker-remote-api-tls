@@ -3,10 +3,11 @@ package de.kekru.dockerremoteapitls.test.utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.security.cert.CertificateFactory;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
-import javax.security.cert.X509Certificate;
+import java.security.cert.X509Certificate;
 
 public class CertUtils {
 
@@ -18,7 +19,7 @@ public class CertUtils {
 
   private X509Certificate getCert(File file) {
     try (InputStream in = new FileInputStream(file)) {
-      return X509Certificate.getInstance(in);
+      return (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(in);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
