@@ -80,7 +80,7 @@ case "$PLATFORMS" in *linux/amd64*) [ "$native" = x86_64 ]  || [ -e /proc/sys/fs
 case "$PLATFORMS" in *linux/arm64*) [ "$native" = aarch64 ] || [ -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ] || need="$need arm64";; esac
 if [ -n "$need" ]; then
   echo "==> Installing QEMU emulators:$need"
-  docker run --privileged --rm tonistiigi/binfmt --install $(echo $need | tr ' ' ',')
+  docker run --privileged --rm tonistiigi/binfmt:qemu-v10.2.3 --install $(echo $need | tr ' ' ',')
 fi
 
 # Multi-platform push needs a docker-container buildx builder
@@ -90,10 +90,16 @@ if ! docker buildx inspect "$BUILDER" >/dev/null 2>&1; then
 fi
 docker buildx inspect --bootstrap "$BUILDER" >/dev/null
 
+# --pull + --no-cache: always start from the current base image and re-run
+# `apk upgrade`, so every release picks up the latest Alpine security fixes
 echo "==> Building $PLATFORMS and pushing $IMAGE:$VERSION, $IMAGE:latest"
 docker buildx build \
   --builder "$BUILDER" \
   --platform "$PLATFORMS" \
+  --pull \
+  --no-cache \
+  --attest type=provenance,mode=max \
+  --attest type=sbom \
   --tag "$IMAGE:$VERSION" \
   --tag "$IMAGE:latest" \
   --label "org.opencontainers.image.version=$VERSION" \

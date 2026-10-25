@@ -1,7 +1,11 @@
 # Original Dockerfile: https://github.com/nginxinc/docker-nginx/blob/b0e153a1b644ca8b2bd378b14913fff316e07cf2/stable/alpine/Dockerfile
 FROM nginx:1.30.6-alpine
-LABEL MAINTAINER="Kevin Krummenauer <kevin@whiledo.de>"
-RUN apk add --no-cache openssl
+LABEL org.opencontainers.image.authors="Kevin Krummenauer <kevin@whiledo.de>" \
+      org.opencontainers.image.title="docker-remote-api-tls" \
+      org.opencontainers.image.description="Docker Remote API secured with mutual TLS via nginx" \
+      org.opencontainers.image.licenses="MIT"
+# upgrade base packages to pick up security fixes released after the base image
+RUN apk upgrade --no-cache && apk add --no-cache openssl
 
 COPY resources/create-certs.sh /script/create-certs.sh
 COPY resources/nginx-cert.conf /etc/nginx/nginx.conf
