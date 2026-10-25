@@ -104,8 +104,8 @@ jobs:
         env:
           IMAGE_REF: ${{ steps.ref.outputs.image }}@${{ steps.build.outputs.digest }}
         run: |
-          docker buildx imagetools inspect "$IMAGE_REF"
-          for arch in amd64 arm64; do
-            docker buildx imagetools inspect "$IMAGE_REF" --format '{{json .Manifest}}' \
-              | grep -q "\"architecture\":\"$arch\"" || { echo "missing $arch"; exit 1; }
+          out=$(docker buildx imagetools inspect "$IMAGE_REF")
+          echo "$out"
+          for platform in linux/amd64 linux/arm64; do
+            echo "$out" | grep -qE "Platform: +$platform$" || { echo "missing $platform"; exit 1; }
           done
