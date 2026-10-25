@@ -1,8 +1,7 @@
 name: sync-upstream
 
 # Keeps this fork in sync with https://github.com/kekru/docker-remote-api-tls:
-# merges upstream/master into master, mirrors new upstream tags and triggers
-# docker-publish.yml for the updated master and for every new release tag.
+# merges upstream/master into master and mirrors new upstream tags.
 #
 # Pushes made with GITHUB_TOKEN are rejected when upstream changes files under
 # .github/workflows. Add a repo secret SYNC_TOKEN (fine-grained PAT with
@@ -15,7 +14,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 concurrency:
   group: sync-upstream
@@ -32,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.BRANCH }}
           fetch-depth: 0
@@ -70,19 +68,17 @@ jobs:
           done
           echo "new_tags=$(echo $new_tags)" >> "$GITHUB_OUTPUT"
 
-      # Pushes made with GITHUB_TOKEN do not trigger workflows, so dispatch explicitly.
-      # A SYNC_TOKEN push to master triggers docker-publish on its own; upstream tag
-      # commits lack docker-publish.yml, so tags are always dispatched from master.
-      - name: Trigger image builds
+      # Images are built and published from the local network host with
+      # publish-remote.sh, so no image build is triggered here.
+      - name: Summary
         env:
-          GH_TOKEN: ${{ github.token }}
-          HAS_PAT: ${{ secrets.SYNC_TOKEN != '' }}
           MASTER_CHANGED: ${{ steps.sync.outputs.master_changed }}
           NEW_TAGS: ${{ steps.sync.outputs.new_tags }}
         run: |
-          if [ "$MASTER_CHANGED" = "true" ] && [ "$HAS_PAT" != "true" ]; then
-            gh workflow run docker-publish.yml --ref "$BRANCH"
-          fi
-          for t in $NEW_TAGS; do
-            gh workflow run docker-publish.yml --ref "$BRANCH" -f ref="$t"
-          done
+          {
+            echo "master updated: ${MASTER_CHANGED:-false}"
+            echo "new upstream tags: ${NEW_TAGS:-none}"
+            if [ "$MASTER_CHANGED" = "true" ]; then
+              echo "Run ./publish-remote.sh to publish a new image."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
