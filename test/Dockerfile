@@ -1,5 +1,5 @@
-FROM docker:27.3.1-cli as docker
-FROM maven:3.6.3-openjdk-8-slim
+FROM docker:29.9.2-cli AS docker
+FROM maven:3.9.16-eclipse-temurin-21
 
 COPY --from=docker --chmod=555 /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker --chmod=555 /usr/local/libexec/docker/cli-plugins/ /root/.docker/cli-plugins

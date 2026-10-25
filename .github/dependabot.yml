@@ -1,0 +1,25 @@
+# Fork-only: keeps base images, actions and test dependencies current.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directories: ["/", "/test"]
+    schedule:
+      interval: weekly
+    ignore:
+      # nginx odd minors (1.31.x) are mainline; stay on stable (even minors)
+      - dependency-name: nginx
+        versions: ["1.31.x", "1.33.x", "1.35.x"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: maven
+    directory: /test
+    schedule:
+      interval: weekly
+    groups:
+      test-deps:
+        patterns: ["*"]
