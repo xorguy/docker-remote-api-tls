@@ -28,6 +28,22 @@ services:
      - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
 
+## Release from local network host (Docker Hub)
+
+`publish-remote.sh` builds on `pi@172.26.30.167` (already `docker login`'d) and pushes
+`xorguy/docker-remote-api-tls:<version>` + `:latest` for amd64 and arm64:
+
+```bash
+git push origin master      # remote host builds what is on the fork, not local files
+./publish-remote.sh         # prompts for release number, e.g. 0.6.0
+./publish-remote.sh 0.6.0   # or non-interactive version
+```
+
+On the host it clones/updates `~/docker-remote-api-tls` (hard reset to `origin/master`),
+registers QEMU (`tonistiigi/binfmt`) for the non-native arch if missing, creates a
+`docker-container` buildx builder `multiarch` once, then `buildx build --push`.
+Override defaults via env: `REMOTE_HOST`, `IMAGE`, `BRANCH`, `PLATFORMS`, `BUILDER`.
+
 ## Workflows
 
 | Workflow | Trigger | Does |
