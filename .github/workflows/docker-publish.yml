@@ -1,0 +1,111 @@
+name: docker-publish
+
+# Builds a multi-arch (linux/amd64 + linux/arm64) image and pushes it to
+# ghcr.io/<owner>/docker-remote-api-tls.
+#
+# - push to master        -> :edge, :sha-<short>
+# - push of tag vX.Y.Z    -> :X.Y.Z, :X.Y (+ :latest if it is the highest tag)
+# - workflow_dispatch     -> same rules, applied to the given `ref`
+#   (used by sync-upstream.yml to build upstream release tags, whose commits
+#   do not contain this workflow file)
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or SHA to build (empty = selected ref)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-publish-${{ inputs.ref || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolve image name and version
+        id: ref
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+          tag=""
+          if [ -n "$INPUT_REF" ]; then
+            git show-ref --verify --quiet "refs/tags/$INPUT_REF" && tag="$INPUT_REF"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          highest=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+          if [ -n "$tag" ] && [ "$tag" = "$highest" ]; then
+            echo "latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Building ref='${INPUT_REF:-$GITHUB_REF}' tag='$tag' highest='$highest'"
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          context: git
+          images: ${{ steps.ref.outputs.image }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ steps.ref.outputs.tag }},enable=${{ steps.ref.outputs.tag != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.ref.outputs.tag }},enable=${{ steps.ref.outputs.tag != '' }}
+            type=raw,value=latest,enable=${{ steps.ref.outputs.latest == 'true' }}
+            type=raw,value=edge,enable=${{ steps.ref.outputs.tag == '' }}
+            type=sha,enable=${{ steps.ref.outputs.tag == '' }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify manifest platforms
+        env:
+          IMAGE_REF: ${{ steps.ref.outputs.image }}@${{ steps.build.outputs.digest }}
+        run: |
+          docker buildx imagetools inspect "$IMAGE_REF"
+          for arch in amd64 arm64; do
+            docker buildx imagetools inspect "$IMAGE_REF" --format '{{json .Manifest}}' \
+              | grep -q "\"architecture\":\"$arch\"" || { echo "missing $arch"; exit 1; }
+          done
