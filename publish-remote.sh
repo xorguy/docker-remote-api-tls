@@ -7,6 +7,7 @@
 #
 # Usage: ./publish-remote.sh [version]      e.g. ./publish-remote.sh 0.6.0
 # Overrides via env: REMOTE_HOST IMAGE REPO_URL BRANCH REMOTE_DIR PLATFORMS BUILDER
+# SSH_OPTS (extra ssh args, e.g. "-p 2220 -i ~/.ssh/key")
 set -euo pipefail
 
 REMOTE_HOST="${REMOTE_HOST:-pi@172.26.30.167}"
@@ -16,6 +17,7 @@ BRANCH="${BRANCH:-master}"
 REMOTE_DIR="${REMOTE_DIR:-docker-remote-api-tls}"   # build checkout, relative to remote $HOME
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 BUILDER="${BUILDER:-multiarch}"
+SSH_OPTS="${SSH_OPTS:-}"   # extra ssh args, split on whitespace
 
 # Warn about local commits the remote build would not see
 if git rev-parse --git-dir >/dev/null 2>&1; then
@@ -54,7 +56,8 @@ read -rp "Publish? [y/N] " ok
 
 args=$(printf '%q ' "$REPO_URL" "$BRANCH" "$REMOTE_DIR" "$IMAGE" "$version" "$PLATFORMS" "$BUILDER")
 
-ssh -T "$REMOTE_HOST" "bash -s -- $args" <<'REMOTE'
+read -ra ssh_opts <<<"$SSH_OPTS"
+ssh -T ${ssh_opts[@]+"${ssh_opts[@]}"} "$REMOTE_HOST" "bash -s -- $args" <<'REMOTE'
 set -euo pipefail
 REPO_URL=$1 BRANCH=$2 REMOTE_DIR=$3 IMAGE=$4 VERSION=$5 PLATFORMS=$6 BUILDER=$7
 

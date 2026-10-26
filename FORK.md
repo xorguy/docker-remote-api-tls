@@ -48,7 +48,8 @@ git push origin master      # remote host builds what is on the fork, not local 
 On the host it clones/updates `~/docker-remote-api-tls` (hard reset to `origin/master`),
 registers QEMU (`tonistiigi/binfmt`) for the non-native arch if missing, creates a
 `docker-container` buildx builder `multiarch` once, then `buildx build --push`.
-Override defaults via env: `REMOTE_HOST`, `IMAGE`, `BRANCH`, `PLATFORMS`, `BUILDER`.
+Override defaults via env: `REMOTE_HOST`, `IMAGE`, `BRANCH`, `PLATFORMS`, `BUILDER`,
+`SSH_OPTS` (extra ssh arguments, e.g. `-p 2220 -i ~/.ssh/key`).
 
 ## Workflows
 
